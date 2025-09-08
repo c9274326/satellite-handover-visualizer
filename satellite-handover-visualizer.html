@@ -34,16 +34,12 @@
         width: 18rem;
         z-index: 10;
       }
-      /* Left panel remains on the left */
       #info-panel-left {
         left: 1rem;
       }
-      /* --- MODIFIED --- Right panel moved to right side and shifted left */
       #info-panel-right {
-        right: 1rem; /* Aligned to the right edge of its container */
+        right: 1rem;
       }
-      /* --- END MODIFIED --- */
-
       .info-panel h2 {
         margin: 0 0 0.5rem 0;
         font-size: 1.1rem;
@@ -115,7 +111,6 @@
         border-radius: 0.25rem;
         cursor: pointer;
         margin-right: 0.5rem;
-        transition: background 0.2s;
       }
       ::-webkit-file-upload-button:hover {
         background: #4b5563;
@@ -132,6 +127,12 @@
         <p>
           Connected Sat:
           <span id="connected-sat-left" class="font-mono">N/A</span>
+        </p>
+        <p>
+          Current SNR:
+          <span id="current-snr-left" class="font-mono font-bold text-cyan-400"
+            >N/A</span
+          >
         </p>
         <p>
           Last HO SNR (Old/New):
@@ -169,6 +170,12 @@
         <p>
           Connected Sat:
           <span id="connected-sat-right" class="font-mono">N/A</span>
+        </p>
+        <p>
+          Current SNR:
+          <span id="current-snr-right" class="font-mono font-bold text-cyan-400"
+            >N/A</span
+          >
         </p>
         <p>
           Last HO SNR (Old/New):
@@ -238,6 +245,10 @@
           const lastHoSnrEl = document.getElementById(
             `last-ho-snr-${isLeft ? "left" : "right"}`
           );
+          // NEW
+          const currentSnrEl = document.getElementById(
+            `current-snr-${isLeft ? "left" : "right"}`
+          );
 
           const EARTH_RADIUS_VIZ = 100;
           const VIZ_SCALE = EARTH_RADIUS_VIZ / 6371e3;
@@ -251,12 +262,7 @@
               0.1,
               5000
             );
-
-            // --- MODIFIED --- Camera position adjustment
-            // If it's the left panel, shift the camera slightly to the right (positive X)
-            // If it's the right panel, keep it centered or shift slightly left (negative X) if needed
-            camera.position.set(isLeft ? 30 : -30, 80, 250); // Adjust X position for visual balance
-            // --- END MODIFIED ---
+            camera.position.set(isLeft ? 30 : -30, 80, 250);
 
             renderer = new THREE.WebGLRenderer({
               antialias: true,
@@ -455,6 +461,21 @@
                 );
             });
 
+            // --- MODIFIED: Update Current SNR display ---
+            if (typeof frameData.current_snr !== "undefined") {
+              if (frameData.current_snr < -900) {
+                // Check for the disconnected value
+                currentSnrEl.textContent = "Disconnected";
+              } else {
+                currentSnrEl.textContent = `${frameData.current_snr.toFixed(
+                  1
+                )} dB`;
+              }
+            } else {
+              currentSnrEl.textContent = "N/A";
+            }
+            // --- END MODIFIED ---
+
             let currentHO = 0,
               currentSatId = -1,
               lastSnrText = "N/A";
@@ -462,10 +483,7 @@
               if (event.t <= frameData.t) {
                 if (event.type === "handover") {
                   currentHO++;
-                  if (
-                    typeof event.snrOld !== "undefined" &&
-                    typeof event.snrNew !== "undefined"
-                  ) {
+                  if (typeof event.snrOld !== "undefined") {
                     lastSnrText = `${event.snrOld.toFixed(
                       1
                     )} / ${event.snrNew.toFixed(1)} dB`;
@@ -512,7 +530,6 @@
             requestAnimationFrame(animate);
             const elapsed = now - (lastAnimateTime || now);
             lastAnimateTime = now;
-
             if (isPlaying) {
               simulationFrame += (elapsed / 1000) * BASE_FPS * playbackRate;
               if (simulationFrame >= timeSlider.max) {
