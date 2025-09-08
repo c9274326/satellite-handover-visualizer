@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Satellite Handover Analysis Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Inter", sans-serif;
+        background-color: #000;
+        color: #fff;
+        overflow: hidden;
+        display: flex;
+      }
+      .simulation-container {
+        width: 50vw;
+        height: 100vh;
+        position: relative;
+        background-color: #0d0d1a;
+      }
+      canvas {
+        display: block;
+      }
+      .info-panel {
+        position: absolute;
+        top: 1rem;
+        background: rgba(17, 24, 39, 0.6);
+        backdrop-filter: blur(8px);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(75, 85, 99, 0.5);
+        width: 18rem;
+        z-index: 10;
+      }
+      /* Left panel remains on the left */
+      #info-panel-left {
+        left: 1rem;
+      }
+      /* --- MODIFIED --- Right panel moved to right side and shifted left */
+      #info-panel-right {
+        right: 1rem; /* Aligned to the right edge of its container */
+      }
+      /* --- END MODIFIED --- */
+
+      .info-panel h2 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-bottom: 1px solid #4a5568;
+        padding-bottom: 0.5rem;
+      }
+      .info-panel p {
+        margin: 0.4rem 0;
+        font-size: 0.8rem;
+      }
+      .controls {
+        position: absolute;
+        bottom: 1.25rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(17, 24, 39, 0.7);
+        backdrop-filter: blur(8px);
+        padding: 0.75rem 1.25rem;
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        z-index: 10;
+      }
+      .time-slider {
+        width: 25vw;
+        max-width: 350px;
+        height: 8px;
+        background: #4b5563;
+        border-radius: 9999px;
+        appearance: none;
+        cursor: pointer;
+        outline: none;
+        accent-color: #2196f3;
+      }
+      button {
+        background: #374151;
+        color: white;
+        border: none;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background 0.2s;
+      }
+      button:hover {
+        background: #4b5563;
+      }
+      .play-btn {
+        background: #2196f3;
+      }
+      .play-btn:hover {
+        background: #1976d2;
+      }
+      .speed-btn.active {
+        background: #2196f3;
+        box-shadow: 0 0 8px rgba(33, 150, 243, 0.7);
+      }
+      input[type="file"] {
+        color: #ccc;
+        font-size: 0.875rem;
+      }
+      ::-webkit-file-upload-button {
+        background: #374151;
+        color: white;
+        border: none;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        margin-right: 0.5rem;
+        transition: background 0.2s;
+      }
+      ::-webkit-file-upload-button:hover {
+        background: #4b5563;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="simulation-container-left" class="simulation-container">
+      <div id="info-panel-left" class="info-panel">
+        <h2>Simulation Data (Left)</h2>
+        <input type="file" id="file-input-left" accept=".json" />
+        <p>Time: <span id="current-time-left" class="font-mono">N/A</span> s</p>
+        <p>Handovers: <span id="ho-count-left" class="font-mono">N/A</span></p>
+        <p>
+          Connected Sat:
+          <span id="connected-sat-left" class="font-mono">N/A</span>
+        </p>
+        <p>
+          Last HO SNR (Old/New):
+          <span id="last-ho-snr-left" class="font-mono">N/A</span>
+        </p>
+      </div>
+      <div id="controls-left" class="controls">
+        <button id="play-pause-btn-left" class="play-btn">▶</button>
+        <input
+          type="range"
+          id="time-slider-left"
+          min="0"
+          max="1"
+          value="0"
+          disabled
+          class="time-slider"
+        />
+        <div class="flex items-center gap-2" id="speed-controls-left">
+          <button class="speed-btn" data-speed="0.5">0.5x</button>
+          <button class="speed-btn active" data-speed="1">1x</button>
+          <button class="speed-btn" data-speed="2">2x</button>
+          <button class="speed-btn" data-speed="4">4x</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="simulation-container-right" class="simulation-container">
+      <div id="info-panel-right" class="info-panel">
+        <h2>Simulation Data (Right)</h2>
+        <input type="file" id="file-input-right" accept=".json" />
+        <p>
+          Time: <span id="current-time-right" class="font-mono">N/A</span> s
+        </p>
+        <p>Handovers: <span id="ho-count-right" class="font-mono">N/A</span></p>
+        <p>
+          Connected Sat:
+          <span id="connected-sat-right" class="font-mono">N/A</span>
+        </p>
+        <p>
+          Last HO SNR (Old/New):
+          <span id="last-ho-snr-right" class="font-mono">N/A</span>
+        </p>
+      </div>
+      <div id="controls-right" class="controls">
+        <button id="play-pause-btn-right" class="play-btn">▶</button>
+        <input
+          type="range"
+          id="time-slider-right"
+          min="0"
+          max="1"
+          value="0"
+          disabled
+          class="time-slider"
+        />
+        <div class="flex items-center gap-2" id="speed-controls-right">
+          <button class="speed-btn" data-speed="0.5">0.5x</button>
+          <button class="speed-btn active" data-speed="1">1x</button>
+          <button class="speed-btn" data-speed="2">2x</button>
+          <button class="speed-btn" data-speed="4">4x</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        function createSimulation(containerId, otherContainerId) {
+          const container = document.getElementById(containerId);
+          const isLeft = containerId.includes("left");
+
+          let scene, camera, renderer, controls, sunLight;
+          let earth, ueMarker, connectionMesh, orbitPathMesh;
+          const satellites = [];
+          let simulationData = null;
+          let isPlaying = false,
+            isSyncingCamera = false;
+          let playbackRate = 1.0,
+            simulationFrame = 0.0,
+            lastAnimateTime = 0;
+          const BASE_FPS = 30;
+
+          const fileInput = document.getElementById(
+            `file-input-${isLeft ? "left" : "right"}`
+          );
+          const timeSlider = document.getElementById(
+            `time-slider-${isLeft ? "left" : "right"}`
+          );
+          const playPauseBtn = document.getElementById(
+            `play-pause-btn-${isLeft ? "left" : "right"}`
+          );
+          const speedControlsContainer = document.getElementById(
+            `speed-controls-${isLeft ? "left" : "right"}`
+          );
+          const currentTimeEl = document.getElementById(
+            `current-time-${isLeft ? "left" : "right"}`
+          );
+          const hoCountEl = document.getElementById(
+            `ho-count-${isLeft ? "left" : "right"}`
+          );
+          const connectedSatEl = document.getElementById(
+            `connected-sat-${isLeft ? "left" : "right"}`
+          );
+          const lastHoSnrEl = document.getElementById(
+            `last-ho-snr-${isLeft ? "left" : "right"}`
+          );
+
+          const EARTH_RADIUS_VIZ = 100;
+          const VIZ_SCALE = EARTH_RADIUS_VIZ / 6371e3;
+
+          function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050515);
+            camera = new THREE.PerspectiveCamera(
+              75,
+              container.clientWidth / container.clientHeight,
+              0.1,
+              5000
+            );
+
+            // --- MODIFIED --- Camera position adjustment
+            // If it's the left panel, shift the camera slightly to the right (positive X)
+            // If it's the right panel, keep it centered or shift slightly left (negative X) if needed
+            camera.position.set(isLeft ? 30 : -30, 80, 250); // Adjust X position for visual balance
+            // --- END MODIFIED ---
+
+            renderer = new THREE.WebGLRenderer({
+              antialias: true,
+              alpha: true,
+            });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            scene.add(new THREE.AmbientLight(0x444444));
+            sunLight.position.set(1, 0, 0);
+            scene.add(sunLight);
+
+            const textureLoader = new THREE.TextureLoader();
+            const earthTexture = textureLoader.load(
+              "https://threejs.org/examples/textures/land_ocean_ice_cloud_2048.jpg"
+            );
+            const earthMaterial = new THREE.MeshPhongMaterial({
+              map: earthTexture,
+              shininess: 10,
+            });
+            const earthGeometry = new THREE.SphereGeometry(
+              EARTH_RADIUS_VIZ,
+              64,
+              64
+            );
+            earth = new THREE.Mesh(earthGeometry, earthMaterial);
+            scene.add(earth);
+
+            const starGeometry = new THREE.SphereGeometry(3000, 64, 64);
+            const starMaterial = new THREE.MeshBasicMaterial({
+              map: textureLoader.load(
+                "https://threejs.org/examples/textures/starry-milky-way-panorama-3k.jpg"
+              ),
+              side: THREE.BackSide,
+            });
+            scene.add(new THREE.Mesh(starGeometry, starMaterial));
+
+            controls.addEventListener("change", () => {
+              if (isSyncingCamera) return;
+              const otherSim = window.simulations[otherContainerId];
+              if (otherSim) otherSim.syncCameraFrom(camera, controls);
+            });
+
+            fileInput.addEventListener("change", handleFileLoad);
+            timeSlider.addEventListener("input", handleSliderChange);
+            playPauseBtn.addEventListener("click", togglePlayPause);
+            speedControlsContainer.addEventListener("click", (e) => {
+              if (e.target.classList.contains("speed-btn")) {
+                const newRate = parseFloat(e.target.dataset.speed);
+                setPlaybackRate(newRate);
+                const otherSim = window.simulations[otherContainerId];
+                if (otherSim) otherSim.setPlaybackRate(newRate);
+              }
+            });
+            window.addEventListener("resize", onWindowResize, false);
+            requestAnimationFrame(animate);
+          }
+
+          function handleFileLoad(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                simulationData = JSON.parse(e.target.result);
+                setupSceneFromData();
+              } catch (error) {
+                alert("Error parsing JSON file: " + error.message);
+              }
+            };
+            reader.readAsText(file);
+          }
+
+          function setupSceneFromData() {
+            satellites.forEach((s) => scene.remove(s));
+            satellites.length = 0;
+            if (ueMarker) scene.remove(ueMarker);
+            if (connectionMesh) scene.remove(connectionMesh);
+            if (orbitPathMesh) scene.remove(orbitPathMesh);
+
+            const config = simulationData.config;
+            const ueGeom = new THREE.ConeGeometry(2, 5, 8);
+            const ueMat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+            ueMarker = new THREE.Mesh(ueGeom, ueMat);
+            const latRad = THREE.MathUtils.degToRad(config.ueLat),
+              lonRad = THREE.MathUtils.degToRad(config.ueLon);
+            const uePos = new THREE.Vector3(
+              EARTH_RADIUS_VIZ * Math.cos(latRad) * Math.cos(lonRad),
+              EARTH_RADIUS_VIZ * Math.sin(latRad),
+              -EARTH_RADIUS_VIZ * Math.cos(latRad) * Math.sin(lonRad)
+            );
+            ueMarker.position.copy(uePos);
+            ueMarker.lookAt(new THREE.Vector3(0, 0, 0));
+            scene.add(ueMarker);
+
+            const satGeom = new THREE.SphereGeometry(1.5, 16, 16);
+            for (let i = 0; i < config.nSats; i++) {
+              const satMat = new THREE.MeshPhongMaterial({
+                color: 0xcccccc,
+                emissive: 0x333333,
+              });
+              satellites.push(new THREE.Mesh(satGeom, satMat));
+              scene.add(satellites[i]);
+            }
+
+            const linkMaterial = new THREE.MeshBasicMaterial({
+              color: 0x00ffff,
+              transparent: true,
+              opacity: 0.85,
+              depthTest: false,
+            });
+            connectionMesh = new THREE.Mesh(
+              new THREE.TubeGeometry(
+                new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3()),
+                2,
+                0.5,
+                8,
+                false
+              ),
+              linkMaterial
+            );
+            connectionMesh.renderOrder = 999;
+            scene.add(connectionMesh);
+
+            const orbitMaterial = new THREE.LineBasicMaterial({
+              color: 0xffaa00,
+              transparent: true,
+              opacity: 0.7,
+            });
+            orbitPathMesh = new THREE.Line(
+              new THREE.BufferGeometry(),
+              orbitMaterial
+            );
+            scene.add(orbitPathMesh);
+
+            isPlaying = false;
+            playPauseBtn.textContent = "▶";
+            simulationFrame = 0;
+            timeSlider.max = simulationData.positions.length - 1;
+            timeSlider.value = 0;
+            timeSlider.disabled = false;
+            updateSceneForFrame(0);
+            syncOtherPlayer();
+          }
+
+          function getOrbitPoints(satId, startFrame, numPoints) {
+            const points = [];
+            const maxFrame = simulationData.positions.length;
+            for (let i = 0; i < numPoints; i++) {
+              const frameIndex = startFrame + i;
+              if (frameIndex >= maxFrame) break;
+              const pos = simulationData.positions[frameIndex].pos[satId];
+              if (pos)
+                points.push(
+                  new THREE.Vector3(
+                    pos.x * VIZ_SCALE,
+                    pos.z * VIZ_SCALE,
+                    -pos.y * VIZ_SCALE
+                  )
+                );
+            }
+            return points;
+          }
+
+          function updateSceneForFrame(frame) {
+            if (!simulationData) return;
+            const currentFrame = Math.min(
+              Math.floor(frame),
+              simulationData.positions.length - 1
+            );
+
+            timeSlider.value = currentFrame;
+            const frameData = simulationData.positions[currentFrame];
+            currentTimeEl.textContent = frameData.t.toFixed(2);
+
+            if (frameData.sun_pos)
+              sunLight.position
+                .set(
+                  frameData.sun_pos.x,
+                  frameData.sun_pos.z,
+                  frameData.sun_pos.y
+                )
+                .normalize();
+
+            frameData.pos.forEach((pos, i) => {
+              if (satellites[i])
+                satellites[i].position.set(
+                  pos.x * VIZ_SCALE,
+                  pos.z * VIZ_SCALE,
+                  -pos.y * VIZ_SCALE
+                );
+            });
+
+            let currentHO = 0,
+              currentSatId = -1,
+              lastSnrText = "N/A";
+            for (const event of simulationData.events) {
+              if (event.t <= frameData.t) {
+                if (event.type === "handover") {
+                  currentHO++;
+                  if (
+                    typeof event.snrOld !== "undefined" &&
+                    typeof event.snrNew !== "undefined"
+                  ) {
+                    lastSnrText = `${event.snrOld.toFixed(
+                      1
+                    )} / ${event.snrNew.toFixed(1)} dB`;
+                  }
+                }
+                currentSatId = event.to;
+              } else break;
+            }
+            hoCountEl.textContent = currentHO;
+            connectedSatEl.textContent =
+              currentSatId !== -1 ? currentSatId : "N/A";
+            lastHoSnrEl.textContent = lastSnrText;
+
+            satellites.forEach((sat, i) => {
+              const isConnected = i === currentSatId;
+              sat.material.color.set(isConnected ? 0xffaa00 : 0xcccccc);
+              sat.material.emissive.set(isConnected ? 0xffaa00 : 0x333333);
+            });
+
+            const isConnected =
+              currentSatId !== -1 && satellites[currentSatId] && ueMarker;
+            connectionMesh.visible = isConnected;
+            orbitPathMesh.visible = isConnected;
+
+            if (isConnected) {
+              const satPos = satellites[currentSatId].position;
+              const uePos = ueMarker.position;
+              const newPath = new THREE.LineCurve3(uePos, satPos);
+              connectionMesh.geometry.dispose();
+              connectionMesh.geometry = new THREE.TubeGeometry(
+                newPath,
+                2,
+                0.5,
+                8,
+                false
+              );
+              orbitPathMesh.geometry.setFromPoints(
+                getOrbitPoints(currentSatId, currentFrame, 300)
+              );
+            }
+          }
+
+          function animate(now) {
+            requestAnimationFrame(animate);
+            const elapsed = now - (lastAnimateTime || now);
+            lastAnimateTime = now;
+
+            if (isPlaying) {
+              simulationFrame += (elapsed / 1000) * BASE_FPS * playbackRate;
+              if (simulationFrame >= timeSlider.max) {
+                simulationFrame = timeSlider.max;
+                isPlaying = false;
+                playPauseBtn.textContent = "▶";
+              }
+              updateSceneForFrame(simulationFrame);
+            }
+            controls.update();
+            renderer.render(scene, camera);
+          }
+
+          function syncOtherPlayer() {
+            const otherSim = window.simulations[otherContainerId];
+            if (otherSim && otherSim.getPlaybackState().simulationData) {
+              otherSim.syncPlayback(simulationFrame, isPlaying);
+            }
+          }
+
+          function handleSliderChange(event) {
+            simulationFrame = parseInt(event.target.value);
+            updateSceneForFrame(simulationFrame);
+            syncOtherPlayer();
+          }
+
+          function togglePlayPause() {
+            if (!simulationData) return;
+            isPlaying = !isPlaying;
+            playPauseBtn.textContent = isPlaying ? "❚❚" : "▶";
+            lastAnimateTime = performance.now();
+            syncOtherPlayer();
+          }
+
+          function syncCameraFrom(sourceCamera, sourceControls) {
+            isSyncingCamera = true;
+            camera.position.copy(sourceCamera.position);
+            camera.quaternion.copy(sourceCamera.quaternion);
+            controls.target.copy(sourceControls.target);
+            isSyncingCamera = false;
+          }
+
+          function setPlaybackRate(newRate) {
+            playbackRate = newRate;
+            speedControlsContainer
+              .querySelectorAll(".speed-btn")
+              .forEach((btn) => {
+                btn.classList.toggle(
+                  "active",
+                  parseFloat(btn.dataset.speed) === newRate
+                );
+              });
+          }
+
+          function syncPlayback(frame, state) {
+            if (!simulationData) return;
+            isPlaying = state;
+            playPauseBtn.textContent = isPlaying ? "❚❚" : "▶";
+            simulationFrame = frame;
+            updateSceneForFrame(frame);
+          }
+
+          function onWindowResize() {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+          }
+
+          init();
+
+          return {
+            syncPlayback,
+            syncCameraFrom,
+            setPlaybackRate,
+            getPlaybackState: () => ({ isPlaying, simulationData }),
+          };
+        }
+
+        window.simulations = {};
+        window.simulations["simulation-container-left"] = createSimulation(
+          "simulation-container-left",
+          "simulation-container-right"
+        );
+        window.simulations["simulation-container-right"] = createSimulation(
+          "simulation-container-right",
+          "simulation-container-left"
+        );
+      });
+    </script>
+  </body>
+</html>
